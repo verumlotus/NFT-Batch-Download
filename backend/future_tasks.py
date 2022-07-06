@@ -14,29 +14,40 @@ if not ALCHEMY_KEY:
 ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
 
-def getContractName(contract_addr: str) -> str:
-    """Fetch the name of the contract (if present)
+def getContractNameAndTotalSupply(contract_addr: str) -> dict:
+    """Fetch the name of the contract (if present) and the total number of NFTs in this collection
 
     Args:
         contract_addr (str): Ethereum address of the NFT collection
 
     Returns:
-        str: Name of the contract if present, else empty string
+        dict: 'name' of the contract if present (else empty string) and the 'totalSupply'
     """
     # Use the alchemy NFT enchanced API
-    server_res = requests.post(
-        ALCHEMY_URL,
-        allow_redirects=True,
-        json={
-            "jsonrpc": "2.0",
-            "method": "alchemy_getTokenMetadata",
-            "params": [f'{contract_addr}'],
-            "id": 42
-        }
+    # server_res = requests.post(
+    #     ALCHEMY_URL,
+    #     allow_redirects=True,
+    #     json={
+    #         "jsonrpc": "2.0",
+    #         "method": "alchemy_getTokenMetadata",
+    #         "params": [f'{contract_addr}'],
+    #         "id": 42
+    #     }
+    # )
+    server_res = requests.get(
+        f'{ALCHEMY_URL}/getContractMetadata',
+        params={
+            'contractAddress': contract_addr
+        },
+        allow_redirects=True
     )
     if server_res.status_code != 200 or not server_res.json():
         return ''
-    return server_res.json()['result']['name']
+    res_json = server_res.json()['contractMetadata']
+    return {
+        'name': res_json['name'],
+        'totalSupply': res_json['totalSupply']
+    }
 
 def getMetadataURIs(contract_addr: str) -> list[str]:
     """Given a contract address for an NFT, this function will fetch the metadataURIs for 
@@ -48,5 +59,7 @@ def getMetadataURIs(contract_addr: str) -> list[str]:
     Returns:
         list[str]: A list of all the metadata URIs for each NFT in the collection
     """
+
     
-c = getContractName("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
+c = getContractNameAndTotalSupply("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
+print(c)
