@@ -142,7 +142,9 @@ def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory:
                 #TODO: send to sentry logging
                 print(f'Error uploading to S3: {e}')
 
-def processNftCollection(contract_addr: str, contractMetadata: dict, tokenIdImageUrlPairList: list[tuple[str, str]]):
+def processNftCollection(contract_addr: str):
+    contractMetadata = getContractNameAndTotalSupply(contract_addr)
+    tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
     i = 0
     increment_jump = 50
     while i < len(tokenIdImageUrlPairList):
@@ -159,4 +161,4 @@ def processNftCollection(contract_addr: str, contractMetadata: dict, tokenIdImag
     # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
     
 imageUriList = getTokenIdImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
-uploadImagesToS3('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D', {'name': 'BAYC'}, imageUriList)
+# uploadImagesToS3('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D', {'name': 'BAYC'}, imageUriList)
