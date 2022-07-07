@@ -6,6 +6,7 @@ from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_
 import mimetypes
 import time
 import boto3
+import shutil
 
 # Configure the provider for web3
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
@@ -125,8 +126,15 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
     return
 
 def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory: str):
+    """Uploads all images in 'imageDirectory' to an S3 bucket
+
+    Args:
+        contract_addr (str): Address of the contract
+        contractMetadata (dict): Name and Total Supply of the contract
+        imageDirectory (str): Directory where images are locally downloaded
+    """
     nft_dir_name = f'{contractMetadata["name"]} ({contract_addr})'
-    for rootDir, subDir, files in os.walk(IMAGE_CACHE_DIR):
+    for rootDir, subDir, files in os.walk(imageDirectory):
         for file in files:
             try:
                 s3.upload_file(Filename=f'{rootDir}/{file}', Bucket=BUCKET_NAME, Key=f'{nft_dir_name}/{file}')
@@ -141,13 +149,14 @@ def processNftCollection(contract_addr: str, contractMetadata: dict, tokenIdImag
         # Download images in batches of 'increment_jump' 
         downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
         # Batch upload the images to S3
-        # Delete the images locally 
+        uploadImagesToS3(contract_addr, contractMetadata, IMAGE_CACHE_DIR)
+        # Delete the images locally to free up space
+        if os.path.isdir(IMAGE_CACHE_DIR):
+            shutil.rmtree(IMAGE_CACHE_DIR)
         # Repeat until all images have been uploaded to S3
-
         i += increment_jump
     
     # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
-    pass
     
 imageUriList = getTokenIdImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
 uploadImagesToS3('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D', {'name': 'BAYC'}, imageUriList)
