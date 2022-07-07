@@ -11,6 +11,7 @@ ALCHEMY_KEY = os.getenv("ALCHEMY_KEY")
 if not ALCHEMY_KEY:
     print("No ALCHEMY_KEY was configured in .env!")
     exit(0)
+
 # Configure the provider for web3
 ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
@@ -67,25 +68,31 @@ def getImageURIs(contract_addr: str) -> list[tuple[str, str]]:
         )
         
         if server_res.status_code != 200 or not server_res.json():
-            return ''
+            return imageURI_list
         res_json = server_res.json()
         # Get the image URIs for all the NFTs returned in this response
         for nftData in res_json['nfts']:
-            # TODO: Convert this hex into a decimal number
-            tokenId = nftData['id']['tokenId']
-            imageUri = nftData['media'][0]['raw']
+            # Cast to int to convert string hex to base 10 number
+            tokenId = int(nftData['id']['tokenId'], 16)
+            imageUri = nftData['media'][0]['gateway']
             imageURI_list.append((tokenId, imageUri))
 
         # If no next token then we are done
         if not res_json['nextToken']:
             break
 
-        #TODO: update start Token (need to convert to decimal number from hex string)
-        startToken = res_json['nextToken']
+        # update start Token (need to convert to decimal number from hex string)
+        startToken = int(res_json['nextToken'], 16)
 
-        # TODO: Get rid of this break, it's here only for testing
-        # TODO: need to implement pagination
-        break
+        #TODO - break below is only to prevent pagination during test
+        if (startToken > 1):
+            return res_json
+
     return imageURI_list
+
+def uploadCollectionToS3(tokenIdImageUrlPairList: list[tuple[str, str]]):
     
-getMetadataURIs("0x19b86299c21505cdf59cE63740B240A9C822b5E4")
+
+    
+c = getImageURIs("0x93980f2F30Da266b0667f38A191dc7E92703293F")
+print(c)
