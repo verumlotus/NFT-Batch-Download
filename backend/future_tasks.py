@@ -1,12 +1,15 @@
 from web3 import Web3
 import os
 import requests
-from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME
+from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME, \
+    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME
 import mimetypes
 import time
+import boto3
 
 # Configure the provider for web3
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
+s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
 def getContractNameAndTotalSupply(contract_addr: str) -> dict:
     """Fetch the name of the contract (if present) and the total number of NFTs in this collection
@@ -33,7 +36,7 @@ def getContractNameAndTotalSupply(contract_addr: str) -> dict:
         'totalSupply': res_json['totalSupply']
     }
 
-def getImageURIs(contract_addr: str) -> list[tuple[str, str]]:
+def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
     """Given a contract address for an NFT, this function will fetch the imageURIs for 
     every NFT in the collection
 
@@ -121,14 +124,30 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
 
     return
 
+def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory: str):
+    nft_dir_name = f'{contractMetadata["name"]} ({contract_addr})'
+    for rootDir, subDir, files in os.walk(IMAGE_CACHE_DIR):
+        for file in files:
+            try:
+                s3.upload_file(Filename=f'{rootDir}/{file}', Bucket=BUCKET_NAME, Key=f'{nft_dir_name}/{file}')
+            except Exception as e:
+                #TODO: send to sentry logging
+                print(f'Error uploading to S3: {e}')
 
-def uploadCollectionToS3(contract_addr: str, contractMetadata: dict, tokenIdImageUrlPairList: list[tuple[str, str]]):
-    # Download images in batches of 50 
-    # Batch upload the images to S3
-    # Delete the images locally 
-    # Repeat until all images have been uploaded to S3
+def processNftCollection(contract_addr: str, contractMetadata: dict, tokenIdImageUrlPairList: list[tuple[str, str]]):
+    i = 0
+    increment_jump = 50
+    while i < len(tokenIdImageUrlPairList):
+        # Download images in batches of 'increment_jump' 
+        downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
+        # Batch upload the images to S3
+        # Delete the images locally 
+        # Repeat until all images have been uploaded to S3
+
+        i += increment_jump
+    
     # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
     pass
     
-imageUriList = getImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
-downloadImagesLocally(imageUriList)
+imageUriList = getTokenIdImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
+uploadImagesToS3('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D', {'name': 'BAYC'}, imageUriList)

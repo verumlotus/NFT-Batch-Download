@@ -16,3 +16,14 @@ ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 IMAGE_CACHE_DIR = "imageCache"
 DEFAULT_RATE_LIMIT_COOLDOWN_TIME = 120
 MAX_COOLDOWN_TIME = 240
+
+# Load AWS Credentials 
+AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
+AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
+
+if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
+    print("No AWS credentails were configured in .env!")
+    exit(0)
+
+# AWS S3 bucket name
+BUCKET_NAME = 'nftbatchdownload'
