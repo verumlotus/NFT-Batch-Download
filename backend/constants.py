@@ -29,3 +29,6 @@ if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
 BUCKET_NAME = 'nftbatchdownload'
 _AWS_REGION = 'us-east-1'
 BUCKET_URL_PREFIX = f'https://s3.console.aws.amazon.com/s3/buckets/{BUCKET_NAME}?region={_AWS_REGION}&tab=objects'
+
+# Config
+IS_TESTING = True

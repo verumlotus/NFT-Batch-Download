@@ -2,7 +2,7 @@ from web3 import Web3
 import os
 import requests
 from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_URL_PREFIX
+    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_URL_PREFIX, IS_TESTING
 import datetime
 import mimetypes
 import time
@@ -80,7 +80,7 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
         startToken = int(res_json['nextToken'], 16)
 
         #TODO - break below is only to prevent pagination during test
-        if (startToken > 1):
+        if (IS_TESTING):
             return imageURI_list
 
     return imageURI_list
