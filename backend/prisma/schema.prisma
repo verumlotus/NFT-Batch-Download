@@ -1,0 +1,16 @@
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-py"
+  interface = "sync"
+}
+
+model ContractS3Link {
+    contractAddress String @id
+    s3Link String
+    status String
+    updated_at DateTime @default(now())
+}
