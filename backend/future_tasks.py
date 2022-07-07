@@ -1,8 +1,9 @@
 from web3 import Web3
 import os
 import requests
-from constants import ALCHEMY_URL, IMAGE_CACHE_DIR
+from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME
 import mimetypes
+import time
 
 # Configure the provider for web3
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
@@ -77,7 +78,7 @@ def getImageURIs(contract_addr: str) -> list[tuple[str, str]]:
 
         #TODO - break below is only to prevent pagination during test
         if (startToken > 1):
-            return res_json
+            return imageURI_list
 
     return imageURI_list
 
@@ -92,12 +93,23 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
         os.makedirs(IMAGE_CACHE_DIR)
     
     # Now let's loop through all the images and download them locally
-    for tokenId, imageURL in tokenIdImageUrlPairList:
+    i = 0
+    while i < len(tokenIdImageUrlPairList):
+        tokenId, imageURL = tokenIdImageUrlPairList[i]
         # make the request to the server/gateway
         server_res = requests.get(
             imageURL,
             allow_redirects=True
         )
+        # if the server return status code of 429, it means we are being rate-limited, so let's stop
+        if server_res.status_code == 429:
+            server_suggested_retry = server_res.headers['Retry-After'] or 0
+            # Wait a max of 4 minutes no matter what
+            time_to_sleep = min(MAX_COOLDOWN_TIME, max(server_suggested_retry, DEFAULT_RATE_LIMIT_COOLDOWN_TIME)) 
+            time.sleep(time_to_sleep)
+            # Use continue to go back to the start of the loop and try downloading this image again
+            continue
+
         # Let's guess whether this file is PNG or JPEG using the content header
         contentTypeHeader = server_res.headers['content-type'] 
         # Default to .jpg if we content type header doesn't tell us encoding format
@@ -105,6 +117,7 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
         filePath = f'{IMAGE_CACHE_DIR}/{tokenId}{fileExtension}'
         with open(filePath, 'wb') as f:
             f.write(server_res.content)
+        i += 1
 
     return
 
@@ -115,7 +128,7 @@ def uploadCollectionToS3(contract_addr: str, contractMetadata: dict, tokenIdImag
     # Delete the images locally 
     # Repeat until all images have been uploaded to S3
     # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
-
+    pass
     
-c = getImageURIs("0x93980f2F30Da266b0667f38A191dc7E92703293F")
-print(c)
+imageUriList = getImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
+downloadImagesLocally(imageUriList)

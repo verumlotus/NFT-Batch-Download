@@ -14,3 +14,5 @@ ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 
 # Directory to store locally downloaded images temporarily
 IMAGE_CACHE_DIR = "imageCache"
+DEFAULT_RATE_LIMIT_COOLDOWN_TIME = 120
+MAX_COOLDOWN_TIME = 240
