@@ -1,19 +1,10 @@
-from tracemalloc import start
 from web3 import Web3
-from dotenv import load_dotenv
 import os
 import requests
-# Load environment variables in .env
-load_dotenv()
-ALCHEMY_KEY = os.getenv("ALCHEMY_KEY")
-
-# Ensure that Alchemy URL was set
-if not ALCHEMY_KEY:
-    print("No ALCHEMY_KEY was configured in .env!")
-    exit(0)
+from constants import ALCHEMY_URL, IMAGE_CACHE_DIR
+import mimetypes
 
 # Configure the provider for web3
-ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
 
 def getContractNameAndTotalSupply(contract_addr: str) -> dict:
@@ -90,8 +81,40 @@ def getImageURIs(contract_addr: str) -> list[tuple[str, str]]:
 
     return imageURI_list
 
-def uploadCollectionToS3(tokenIdImageUrlPairList: list[tuple[str, str]]):
+def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]): 
+    """Downloads all images in the tokenIdImageUrlPairList locally
+
+    Args:
+        tokenIdImageUrlPairList (list[tuple[str, str]]): List of (tokenId, ImageURL) tuples
+    """
+    # Create image cache folder if it doesn't already exist
+    if not os.path.isdir(IMAGE_CACHE_DIR):
+        os.makedirs(IMAGE_CACHE_DIR)
     
+    # Now let's loop through all the images and download them locally
+    for tokenId, imageURL in tokenIdImageUrlPairList:
+        # make the request to the server/gateway
+        server_res = requests.get(
+            imageURL,
+            allow_redirects=True
+        )
+        # Let's guess whether this file is PNG or JPEG using the content header
+        contentTypeHeader = server_res.headers['content-type'] 
+        # Default to .jpg if we content type header doesn't tell us encoding format
+        fileExtension = mimetypes.guess_extension(contentTypeHeader) or '.jpg'
+        filePath = f'{IMAGE_CACHE_DIR}/{tokenId}{fileExtension}'
+        with open(filePath, 'wb') as f:
+            f.write(server_res.content)
+
+    return
+
+
+def uploadCollectionToS3(contract_addr: str, contractMetadata: dict, tokenIdImageUrlPairList: list[tuple[str, str]]):
+    # Download images in batches of 50 
+    # Batch upload the images to S3
+    # Delete the images locally 
+    # Repeat until all images have been uploaded to S3
+    # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
 
     
 c = getImageURIs("0x93980f2F30Da266b0667f38A191dc7E92703293F")
