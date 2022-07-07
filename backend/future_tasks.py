@@ -143,6 +143,11 @@ def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory:
                 print(f'Error uploading to S3: {e}')
 
 def processNftCollection(contract_addr: str):
+    """Given a contract address will fetch images and upload them to S3
+
+    Args:
+        contract_addr (str): The address of the contract
+    """
     contractMetadata = getContractNameAndTotalSupply(contract_addr)
     tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
     i = 0
