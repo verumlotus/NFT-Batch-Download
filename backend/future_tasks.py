@@ -2,24 +2,26 @@ from web3 import Web3
 import os
 import requests
 from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME
+    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_URL_PREFIX
+import datetime
 import mimetypes
 import time
 import boto3
 import shutil
+from db_access import db
 
 # Configure the provider for web3
 w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
-def getContractNameAndTotalSupply(contract_addr: str) -> dict:
-    """Fetch the name of the contract (if present) and the total number of NFTs in this collection
+def getContractName(contract_addr: str) -> str:
+    """Fetch the name of the contract (if present)
 
     Args:
         contract_addr (str): Ethereum address of the NFT collection
 
     Returns:
-        dict: 'name' of the contract if present (else empty string) and the 'totalSupply'
+        str: name of this contract
     """
     # Use the alchemy NFT enchanced API
     server_res = requests.get(
@@ -31,11 +33,8 @@ def getContractNameAndTotalSupply(contract_addr: str) -> dict:
     )
     if server_res.status_code != 200 or not server_res.json():
         return ''
-    res_json = server_res.json()['contractMetadata']
-    return {
-        'name': res_json['name'],
-        'totalSupply': res_json['totalSupply']
-    }
+    res_json: dict = server_res.json()['contractMetadata']
+    return res_json.get('name', 'NFT Name Unknown')
 
 def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
     """Given a contract address for an NFT, this function will fetch the imageURIs for 
@@ -123,9 +122,11 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
             f.write(server_res.content)
         i += 1
 
+    # By default, let's sleep for 2 seconds to avoid rate-limiting
+    time.sleep(2)
     return
 
-def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory: str):
+def uploadImagesToS3(contract_addr: str, contractName: str, imageDirectory: str):
     """Uploads all images in 'imageDirectory' to an S3 bucket
 
     Args:
@@ -133,7 +134,7 @@ def uploadImagesToS3(contract_addr: str, contractMetadata: dict, imageDirectory:
         contractMetadata (dict): Name and Total Supply of the contract
         imageDirectory (str): Directory where images are locally downloaded
     """
-    nft_dir_name = f'{contractMetadata["name"]} ({contract_addr})'
+    nft_dir_name = f'{contractName} ({contract_addr})'
     for rootDir, subDir, files in os.walk(imageDirectory):
         for file in files:
             try:
@@ -148,7 +149,7 @@ def processNftCollection(contract_addr: str):
     Args:
         contract_addr (str): The address of the contract
     """
-    contractMetadata = getContractNameAndTotalSupply(contract_addr)
+    contractName = getContractName(contract_addr)
     tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
     i = 0
     increment_jump = 50
@@ -156,14 +157,33 @@ def processNftCollection(contract_addr: str):
         # Download images in batches of 'increment_jump' 
         downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
         # Batch upload the images to S3
-        uploadImagesToS3(contract_addr, contractMetadata, IMAGE_CACHE_DIR)
+        uploadImagesToS3(contract_addr, contractName, IMAGE_CACHE_DIR)
         # Delete the images locally to free up space
         if os.path.isdir(IMAGE_CACHE_DIR):
             shutil.rmtree(IMAGE_CACHE_DIR)
         # Repeat until all images have been uploaded to S3
         i += increment_jump
     
-    # TODO: Should update the DB updating the contract addr -> S3 bucket URL mapping
+    S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
+    print(S3_Link)
+    # TODO: The upsert statement can be moved to an update statement once the whole system is stitched together
+    db.contracts3link.upsert(
+        data={
+            'create': {
+                'contractAddress': contract_addr,
+                's3Link': S3_Link,
+                'status': 'finished',
+                'updated_at': datetime.datetime.now()
+            },
+            'update': {
+                's3Link': 'S3_Link',
+                'status': 'finished',
+                'updated_at': datetime.datetime.now()
+            }
+        }, 
+        where={
+            'contractAddress': contract_addr
+        }
+    )
     
-imageUriList = getTokenIdImageURIs("0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D")
-# uploadImagesToS3('0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D', {'name': 'BAYC'}, imageUriList)
+processNftCollection('0x5180db8F5c931aaE63c74266b211F580155ecac8')

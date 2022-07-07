@@ -14,7 +14,7 @@ ALCHEMY_URL = f'https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}'
 
 # Directory to store locally downloaded images temporarily
 IMAGE_CACHE_DIR = "imageCache"
-DEFAULT_RATE_LIMIT_COOLDOWN_TIME = 120
+DEFAULT_RATE_LIMIT_COOLDOWN_TIME = 60
 MAX_COOLDOWN_TIME = 240
 
 # Load AWS Credentials 
@@ -27,3 +27,5 @@ if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
 
 # AWS S3 bucket name
 BUCKET_NAME = 'nftbatchdownload'
+_AWS_REGION = 'us-east-1'
+BUCKET_URL_PREFIX = f'https://s3.console.aws.amazon.com/s3/buckets/{BUCKET_NAME}?region={_AWS_REGION}&tab=objects'
