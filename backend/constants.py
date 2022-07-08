@@ -33,4 +33,4 @@ _AWS_REGION = 'us-east-1'
 BUCKET_URL_PREFIX = f'https://s3.console.aws.amazon.com/s3/buckets/{BUCKET_NAME}?region={_AWS_REGION}&tab=objects'
 
 # Config
-IS_TESTING = True
+IS_TESTING = os.getenv('IS_TESTING') == 'True'
