@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from future_tasks import processNftCollection
+from tasks import processNftCollection
 from db_access import db
 
 app = FastAPI()
@@ -35,7 +35,7 @@ def handleNftImageRequest(contract_addr: str):
             }
         )
         #TODO Now, let's call the celery task 
-
+        processNftCollection.delay(contract_addr)
         # Return that the job has been queued
         return {'s3Link': 'queued'}
 

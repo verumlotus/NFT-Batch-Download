@@ -25,6 +25,8 @@ if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
     print("No AWS credentails were configured in .env!")
     exit(0)
 
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
+
 # AWS S3 bucket name
 BUCKET_NAME = 'nftbatchdownload'
 _AWS_REGION = 'us-east-1'

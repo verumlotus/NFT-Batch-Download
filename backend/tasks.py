@@ -8,7 +8,12 @@ import time
 import boto3
 import shutil
 from db_access import db
+from celery import Celery
+from celery.utils.log import get_task_logger
 
+app = Celery('tasks')
+app.config_from_object('celeryconfig')
+logger = get_task_logger(__name__)
 # Configure AWS S3 client
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
@@ -142,12 +147,14 @@ def uploadImagesToS3(contract_addr: str, contractName: str, imageDirectory: str)
                 #TODO: send to sentry & datadog logging
                 print(f'Error uploading to S3: {e}')
 
+@app.task
 def processNftCollection(contract_addr: str):
     """Given a contract address will fetch images and upload them to S3
 
     Args:
         contract_addr (str): The address of the contract
     """
+    logger.info(f'Processing collection at address: {contract_addr}')
     contractName = getContractName(contract_addr)
     tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
     i = 0

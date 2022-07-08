@@ -1,0 +1,2 @@
+from constants import CELERY_BROKER_URL
+broker_url = CELERY_BROKER_URL
