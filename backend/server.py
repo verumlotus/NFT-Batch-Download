@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from tasks import processNftCollection
 from db_access import db
+import logging.config
+
+# Logging config
+logging.config.fileConfig('./logConfig/logging.ini')
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -12,11 +17,13 @@ def read_root():
 def handleNftImageRequest(contract_addr: str):
     # First, let's check if this NFT contract address has already been requested and is either queued 
     # up or has finished
+    logger.debug(f'API endpoint hit for contract address: {contract_addr}')
     dbRecord = db.contracts3link.find_first(
         where={
             'contractAddress': contract_addr
         }
     )
+    logger.debug(f'DB Queried for contract addr: {contract_addr} || and it found a record of {dbRecord}')
 
     # Case 1: DbRecord is found, and status is finished (we have the S3 link we can return)
     if dbRecord and dbRecord.status == 'finished':
@@ -34,6 +41,7 @@ def handleNftImageRequest(contract_addr: str):
                 'status': 'pending',
             }
         )
+        logger.debug(f'Starting celery task for {contract_addr}')
         #TODO Now, let's call the celery task 
         processNftCollection.delay(contract_addr)
         # Return that the job has been queued

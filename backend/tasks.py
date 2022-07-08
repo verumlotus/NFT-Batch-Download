@@ -9,13 +9,18 @@ import boto3
 import shutil
 from db_access import db
 from celery import Celery
-from celery.utils.log import get_task_logger
+import logging.config
 
+# Celery config
 app = Celery('tasks')
 app.config_from_object('celeryconfig')
-logger = get_task_logger(__name__)
+
 # Configure AWS S3 client
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+
+# Logging config
+logging.config.fileConfig('./logConfig/logging.ini')
+logger = logging.getLogger(__name__)
 
 def getContractName(contract_addr: str) -> str:
     """Fetch the name of the contract (if present)
@@ -37,7 +42,9 @@ def getContractName(contract_addr: str) -> str:
     if server_res.status_code != 200 or not server_res.json():
         return ''
     res_json: dict = server_res.json()['contractMetadata']
-    return res_json.get('name', 'NFT Name Unknown')
+    name = res_json.get('name', 'NFT Name Unknown')
+    logger.debug(f'For contract addr: {contract_addr} we got a name of : {name}')
+    return name
 
 def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
     """Given a contract address for an NFT, this function will fetch the imageURIs for 
@@ -64,9 +71,22 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
             },
             allow_redirects=True
         )
+
+        # if the server return status code of 429, it means we are being rate-limited, so let's stop
+        if server_res.status_code == 429:
+            logger.info(f'getTokenIdImageURIs received 429 status code for {contract_addr}')
+            server_suggested_retry = server_res.headers.get('Retry-After', 0)
+            # Wait a max of 4 minutes no matter what
+            time_to_sleep = min(MAX_COOLDOWN_TIME, max(server_suggested_retry, DEFAULT_RATE_LIMIT_COOLDOWN_TIME)) 
+            logger.info(f'getTokenIdImageURIs sleeping for: {time_to_sleep}')
+            time.sleep(time_to_sleep)
+            # Use continue to go back to the start of the loop and try downloading this image again
+            continue
         
-        if server_res.status_code != 200 or not server_res.json():
+        elif server_res.status_code != 200 or not server_res.json():
+            logger.error(f'For contract addr: {contract_addr} in getTokenIdImageURIs we got status code of : {server_res.status_code}')
             return imageURI_list
+        
         res_json = server_res.json()
         # Get the image URIs for all the NFTs returned in this response
         for nftData in res_json['nfts']:
@@ -85,7 +105,7 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
         #TODO - break below is only to prevent pagination during test
         if (IS_TESTING):
             return imageURI_list
-
+    logger.debug(f'Got all image URIs for contract addr: {contract_addr}')
     return imageURI_list
 
 def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]): 
@@ -109,10 +129,11 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
         )
         # if the server return status code of 429, it means we are being rate-limited, so let's stop
         if server_res.status_code == 429:
-            #TODO: Datadog logging
+            logger.info(f'downloadImagesLocally received 429 status code for tokenId: {tokenId} and imageUrl: {imageURL}')
             server_suggested_retry = server_res.headers.get('Retry-After', 0)
             # Wait a max of 4 minutes no matter what
             time_to_sleep = min(MAX_COOLDOWN_TIME, max(server_suggested_retry, DEFAULT_RATE_LIMIT_COOLDOWN_TIME)) 
+            logger.info(f'downloadImagesLocally sleeping for: {time_to_sleep}')
             time.sleep(time_to_sleep)
             # Use continue to go back to the start of the loop and try downloading this image again
             continue
@@ -154,40 +175,44 @@ def processNftCollection(contract_addr: str):
     Args:
         contract_addr (str): The address of the contract
     """
-    logger.info(f'Processing collection at address: {contract_addr}')
-    contractName = getContractName(contract_addr)
-    tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
-    i = 0
-    increment_jump = 50
-    while i < len(tokenIdImageUrlPairList):
-        # Download images in batches of 'increment_jump' 
-        downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
-        # Batch upload the images to S3
-        uploadImagesToS3(contract_addr, contractName, IMAGE_CACHE_DIR)
-        # Delete the images locally to free up space
-        if os.path.isdir(IMAGE_CACHE_DIR):
-            shutil.rmtree(IMAGE_CACHE_DIR)
-        # Repeat until all images have been uploaded to S3
-        i += increment_jump
-    
-    S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
-    print(S3_Link)
-    # TODO: The upsert statement can be moved to an update statement once the whole system is stitched together
-    db.contracts3link.upsert(
-        data={
-            'create': {
-                'contractAddress': contract_addr,
-                's3Link': S3_Link,
-                'status': 'finished',
-                'updated_at': datetime.datetime.now()
-            },
-            'update': {
-                's3Link': 'S3_Link',
-                'status': 'finished',
-                'updated_at': datetime.datetime.now()
+    logger.debug(f'Begin processNftCollection for contract address {contract_addr}')
+    try:
+        contractName = getContractName(contract_addr)
+        tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
+        i = 0
+        increment_jump = 50
+        while i < len(tokenIdImageUrlPairList):
+            # Download images in batches of 'increment_jump' 
+            downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
+            # Batch upload the images to S3
+            uploadImagesToS3(contract_addr, contractName, IMAGE_CACHE_DIR)
+            # Delete the images locally to free up space
+            if os.path.isdir(IMAGE_CACHE_DIR):
+                shutil.rmtree(IMAGE_CACHE_DIR)
+            # Repeat until all images have been uploaded to S3
+            i += increment_jump
+            logger.debug(f'Finished one batch for {contract_addr} with i:{i}')
+        
+        S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
+        logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
+        # TODO: The upsert statement can be moved to an update statement once the whole system is stitched together
+        db.contracts3link.upsert(
+            data={
+                'create': {
+                    'contractAddress': contract_addr,
+                    's3Link': S3_Link,
+                    'status': 'finished',
+                    'updated_at': datetime.datetime.now()
+                },
+                'update': {
+                    's3Link': 'S3_Link',
+                    'status': 'finished',
+                    'updated_at': datetime.datetime.now()
+                }
+            }, 
+            where={
+                'contractAddress': contract_addr
             }
-        }, 
-        where={
-            'contractAddress': contract_addr
-        }
-    )
+        )
+    except Exception as e:
+        logger.error(e, exc_info=True)
