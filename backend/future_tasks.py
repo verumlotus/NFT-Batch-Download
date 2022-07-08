@@ -73,7 +73,7 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
             imageURI_list.append((tokenId, imageUri))
 
         # If no next token then we are done
-        if not res_json['nextToken']:
+        if not res_json.get('nextToken', None):
             break
 
         # update start Token (need to convert to decimal number from hex string)
@@ -106,7 +106,7 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
         )
         # if the server return status code of 429, it means we are being rate-limited, so let's stop
         if server_res.status_code == 429:
-            server_suggested_retry = server_res.headers['Retry-After'] or 0
+            server_suggested_retry = server_res.headers.get('Retry-After', 0)
             # Wait a max of 4 minutes no matter what
             time_to_sleep = min(MAX_COOLDOWN_TIME, max(server_suggested_retry, DEFAULT_RATE_LIMIT_COOLDOWN_TIME)) 
             time.sleep(time_to_sleep)
@@ -114,7 +114,7 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
             continue
 
         # Let's guess whether this file is PNG or JPEG using the content header
-        contentTypeHeader = server_res.headers['content-type'] 
+        contentTypeHeader = server_res.headers.get('content-type', None)
         # Default to .jpg if we content type header doesn't tell us encoding format
         fileExtension = mimetypes.guess_extension(contentTypeHeader) or '.jpg'
         filePath = f'{IMAGE_CACHE_DIR}/{tokenId}{fileExtension}'
@@ -135,12 +135,12 @@ def uploadImagesToS3(contract_addr: str, contractName: str, imageDirectory: str)
         imageDirectory (str): Directory where images are locally downloaded
     """
     nft_dir_name = f'{contractName} ({contract_addr})'
-    for rootDir, subDir, files in os.walk(imageDirectory):
+    for rootDir, _, files in os.walk(imageDirectory):
         for file in files:
             try:
                 s3.upload_file(Filename=f'{rootDir}/{file}', Bucket=BUCKET_NAME, Key=f'{nft_dir_name}/{file}')
             except Exception as e:
-                #TODO: send to sentry logging
+                #TODO: send to sentry & datadog logging
                 print(f'Error uploading to S3: {e}')
 
 def processNftCollection(contract_addr: str):
