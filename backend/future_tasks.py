@@ -1,4 +1,3 @@
-from web3 import Web3
 import os
 import requests
 from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME, \
@@ -10,8 +9,7 @@ import boto3
 import shutil
 from db_access import db
 
-# Configure the provider for web3
-w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
+# Configure AWS S3 client
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
 def getContractName(contract_addr: str) -> str:
@@ -106,6 +104,7 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
         )
         # if the server return status code of 429, it means we are being rate-limited, so let's stop
         if server_res.status_code == 429:
+            #TODO: Datadog logging
             server_suggested_retry = server_res.headers.get('Retry-After', 0)
             # Wait a max of 4 minutes no matter what
             time_to_sleep = min(MAX_COOLDOWN_TIME, max(server_suggested_retry, DEFAULT_RATE_LIMIT_COOLDOWN_TIME)) 
@@ -185,5 +184,3 @@ def processNftCollection(contract_addr: str):
             'contractAddress': contract_addr
         }
     )
-    
-processNftCollection('0x5180db8F5c931aaE63c74266b211F580155ecac8')
