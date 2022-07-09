@@ -113,7 +113,7 @@ def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 1
         startToken = int(res_json['nextToken'], 16)
 
         # Break below is only to prevent pagination during test
-        if (IS_TESTING and False):
+        if (IS_TESTING):
             return imageURI_list
 
     logger.debug(f'Got all image URIs for contract addr: {contract_addr}')
