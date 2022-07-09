@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from tasks import processNftCollection
 from db_access import db
 from constants import LOGTAIL_SOURCE_TOKEN
@@ -14,6 +15,19 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
