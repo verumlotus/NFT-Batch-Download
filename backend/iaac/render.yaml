@@ -1,44 +1,46 @@
 services:
+  - type: web
+    name: server
+    region: ohio
+    env: docker
+    dockerfilePath: ../Server.Dockerfile
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: celery-redis
+          type: redis
+          property: connectionString
+      - fromGroup: conf-settings
   - type: worker
-    name: queue
+    name: celery-worker
     region: ohio
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery --app tasks worker --loglevel info --concurrency 4"
+    env: docker
+    dockerfilePath: ../Worker.Dockerfile
     envVars:
       - key: CELERY_BROKER_URL
         fromService:
           name: celery-redis
           type: redis
           property: connectionString
-  - type: web
-    name: app
-    region: ohio
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
-    envVars:
-      - key: CELERY_BROKER_URL
-        fromService:
-          name: celery-redis
-          type: redis
-          property: connectionString
-  - type: web
-    name: flower
-    region: ohio
-    plan: free
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery flower --app tasks --loglevel info"
-    envVars:
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: celery-redis
-          property: connectionString
+      - fromGroup: conf-settings
   - type: redis
     name: celery-redis
     region: ohio
     plan: starter # we choose a plan with persistence to ensure tasks are not lost upon restart
     maxmemoryPolicy: noeviction # recommended policy for queues
     ipAllowList: [] # only allow internal connections
+envVarGroups:
+- name: conf-settings
+  envVars:
+    - key: IS_TESTING
+      sync: false # will be user provided
+    - key: ALCHEMY_KEY
+      sync: false # will be user provided
+    - key: AWS_ACCESS_KEY
+      sync: false # will be user provided
+    - key: AWS_SECRET_KEY
+      sync: false # will be user provided
+    - key: DATABASE_URL
+      sync: false # will be user provided
+    - key: LOGTAIL_SOURCE_TOKEN
+      sync: false # will be user provided
