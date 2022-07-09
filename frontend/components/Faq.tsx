@@ -21,7 +21,7 @@ export default function Faq() {
         <AccordionDetails>
           <Typography variant={"body1"}>
             On-chain contracts only contain a reference to the NFT image & metadata. The actual content is stored on IPFS or a 
-            Web Server. It&apos;s a misconception that data stored on IPFS is permanent – many NFT collections use 3rd party pinning
+            Web Server (e.g. for Crypto Coven & Milady). It&apos;s a misconception that data stored on IPFS is permanent – many NFT collections use 3rd party pinning
             services to make their content available. If the data is no longer pinned, it may be lost forever. For web servers, if the 
             server is shutdown (forgetting to pay the bill, malicious intent, etc.) images & metadata are inaccessible and your NFT points
             to a 404 link. The IPFS hash of images stored locally can be checked against historical blockchain data to verify an image was
