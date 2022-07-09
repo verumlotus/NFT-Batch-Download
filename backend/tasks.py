@@ -196,23 +196,24 @@ def processNftCollection(contract_addr: str):
         S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
         logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
         # TODO: The upsert statement can be moved to an update statement once the whole system is stitched together
-        db.contracts3link.upsert(
-            data={
-                'create': {
-                    'contractAddress': contract_addr,
-                    's3Link': S3_Link,
-                    'status': 'finished',
-                    'updated_at': datetime.datetime.now()
-                },
-                'update': {
-                    's3Link': 'S3_Link',
-                    'status': 'finished',
-                    'updated_at': datetime.datetime.now()
+        if not IS_TESTING:
+            db.contracts3link.upsert(
+                data={
+                    'create': {
+                        'contractAddress': contract_addr,
+                        's3Link': S3_Link,
+                        'status': 'finished',
+                        'updated_at': datetime.datetime.now()
+                    },
+                    'update': {
+                        's3Link': 'S3_Link',
+                        'status': 'finished',
+                        'updated_at': datetime.datetime.now()
+                    }
+                }, 
+                where={
+                    'contractAddress': contract_addr
                 }
-            }, 
-            where={
-                'contractAddress': contract_addr
-            }
-        )
+            )
     except Exception as e:
         logger.error(e, exc_info=True)

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from tasks import processNftCollection
 from db_access import db
+from constants import IS_TESTING
 import logging.config
 
 # Logging config
@@ -33,14 +34,15 @@ def handleNftImageRequest(contract_addr: str):
         return {"s3Link": "pending"}
     # Case 3: No DbRecord is found, we want to kick off a celery task to download the data
     else:
-        # First mark that we are queing up this job 
-        db.contracts3link.create(
-            data={
-                'contractAddress': contract_addr,
-                's3Link': 'null',
-                'status': 'pending',
-            }
-        )
+        # First mark that we are queing up this job
+        if not IS_TESTING: 
+            db.contracts3link.create(
+                data={
+                    'contractAddress': contract_addr,
+                    's3Link': 'null',
+                    'status': 'pending',
+                }
+            )
         logger.debug(f'Starting celery task for {contract_addr}')
         #TODO Now, let's call the celery task 
         processNftCollection.delay(contract_addr)
