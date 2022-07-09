@@ -3,7 +3,7 @@ services:
     name: server
     region: ohio
     env: docker
-    dockerfilePath: ../Server.Dockerfile
+    dockerfilePath: ./backend/Server.Dockerfile
     envVars:
       - key: CELERY_BROKER_URL
         fromService:
@@ -15,7 +15,7 @@ services:
     name: celery-worker
     region: ohio
     env: docker
-    dockerfilePath: ../Worker.Dockerfile
+    dockerfilePath: ./backend/Worker.Dockerfile
     envVars:
       - key: CELERY_BROKER_URL
         fromService:
