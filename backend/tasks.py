@@ -118,7 +118,7 @@ def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 1
         if (IS_TESTING):
             return imageURI_list
 
-    logger.debug(f'Got all image URIs for contract addr: {contract_addr}')
+    logger.debug(f'Got {totalImageURIsFetched} image URIs for contract addr: {contract_addr} starting from startToken of {_startToken}')
     return imageURI_list
 
 def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]): 
