@@ -46,7 +46,7 @@ def getContractName(contract_addr: str) -> str:
     logger.debug(f'For contract addr: {contract_addr} we got a name of : {name}')
     return name
 
-def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
+def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 100) -> list[tuple[str, str]]:
     """Given a contract address for an NFT, this function will fetch the imageURIs for 
     every NFT in the collection
 
@@ -60,14 +60,16 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
     imageURI_list = list()
     # N.B: Enhanced API below only returns up to 100 NFTs at a time, 
     # so we need to paginate through until we get all of the NFTs
-    startToken = 0
+    startToken = _startToken
     while True:
+        logger.info(f'Fetching imageURI data from alchemy for {contract_addr} with start token {startToken}')
         server_res = requests.get(
             f'{ALCHEMY_URL}/getNFTsForCollection',
             params={
                 'contractAddress': contract_addr,
                 'withMetadata': "true",
-                'startToken': startToken
+                'startToken': startToken,
+                'limit': limit
             },
             allow_redirects=True
         )
@@ -84,7 +86,8 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
             continue
         
         elif server_res.status_code != 200 or not server_res.json():
-            logger.error(f'For contract addr: {contract_addr} in getTokenIdImageURIs we got status code of : {server_res.status_code}')
+            logger.error(f'For contract addr: {contract_addr} in getTokenIdImageURIs we got status code of : {server_res.status_code} \
+                when the startToken was: {startToken}')
             return imageURI_list
         
         res_json = server_res.json()
@@ -95,6 +98,10 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
             imageUri = nftData['media'][0]['gateway']
             imageURI_list.append((tokenId, imageUri))
 
+        # If the # of tokens we got is == limit, then we're done
+        if len(res_json['nfts']) == limit or len(res_json['nfts']) == 0:
+            break
+
         # If no next token then we are done
         if not res_json.get('nextToken', None):
             break
@@ -102,9 +109,10 @@ def getTokenIdImageURIs(contract_addr: str) -> list[tuple[str, str]]:
         # update start Token (need to convert to decimal number from hex string)
         startToken = int(res_json['nextToken'], 16)
 
-        #TODO - break below is only to prevent pagination during test
+        # Break below is only to prevent pagination during test
         if (IS_TESTING):
             return imageURI_list
+
     logger.debug(f'Got all image URIs for contract addr: {contract_addr}')
     return imageURI_list
 
@@ -165,8 +173,7 @@ def uploadImagesToS3(contract_addr: str, contractName: str, imageDirectory: str)
             try:
                 s3.upload_file(Filename=f'{rootDir}/{file}', Bucket=BUCKET_NAME, Key=f'{nft_dir_name}/{file}')
             except Exception as e:
-                #TODO: send to sentry & datadog logging
-                print(f'Error uploading to S3: {e}')
+                logger.error(e, exc_info=True)
 
 @app.task
 def processNftCollection(contract_addr: str):
@@ -177,21 +184,26 @@ def processNftCollection(contract_addr: str):
     """
     logger.debug(f'Begin processNftCollection for contract address {contract_addr}')
     try:
-        contractName = getContractName(contract_addr)
-        tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
         dbRecord = db.contracts3link.find_first(
             where={
                 'contractAddress': contract_addr
             }
         )
-        S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
-        logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
         # In the event this task is re-queued, let's skip images we already uploaded
         i = dbRecord.numImagesUploaded
+
+        contractName = getContractName(contract_addr)
+        S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
+        logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
         increment_jump = 50
-        while i < len(tokenIdImageUrlPairList):
+        while True:
+            # Fetch the tokenID and Image URIs
+            tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr, _startToken = i, limit = increment_jump)
+            # Break condition - if no more metadata is returned
+            if not tokenIdImageUrlPairList:
+                break
             # Download images in batches of 'increment_jump' 
-            downloadImagesLocally(tokenIdImageUrlPairList[i: i + increment_jump])
+            downloadImagesLocally(tokenIdImageUrlPairList)
             # Batch upload the images to S3
             uploadImagesToS3(contract_addr, contractName, IMAGE_CACHE_DIR)
             # Delete the images locally to free up space
@@ -214,6 +226,7 @@ def processNftCollection(contract_addr: str):
             )
             logger.debug(f'Uploaded {i} images for contract address: {contract_addr}')
 
+        # Update DB at end to signal that we have uploaded all images in the collection
         db.contracts3link.upsert(
             data={
                 'create': {
