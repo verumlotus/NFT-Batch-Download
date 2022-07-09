@@ -12,5 +12,7 @@ model ContractS3Link {
     contractAddress String @id
     s3Link String
     status String
-    updated_at DateTime @default(now())
+    numImagesUploaded Int @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 }

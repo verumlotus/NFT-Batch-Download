@@ -179,7 +179,15 @@ def processNftCollection(contract_addr: str):
     try:
         contractName = getContractName(contract_addr)
         tokenIdImageUrlPairList = getTokenIdImageURIs(contract_addr)
-        i = 0
+        dbRecord = db.contracts3link.find_first(
+            where={
+                'contractAddress': contract_addr
+            }
+        )
+        S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
+        logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
+        # In the event this task is re-queued, let's skip images we already uploaded
+        i = dbRecord.numImagesUploaded
         increment_jump = 50
         while i < len(tokenIdImageUrlPairList):
             # Download images in batches of 'increment_jump' 
@@ -192,28 +200,34 @@ def processNftCollection(contract_addr: str):
             # Repeat until all images have been uploaded to S3
             i += increment_jump
             logger.debug(f'Finished one batch for {contract_addr} with i:{i}')
-        
-        S3_Link = f'{BUCKET_URL_PREFIX}&prefix={contractName}+%28{contract_addr}%29/&showversions=false'
-        logger.debug(f'S3 Link for contract name: {contractName} and contract addr: {contract_addr} is {S3_Link}')
-        # TODO: The upsert statement can be moved to an update statement once the whole system is stitched together
-        if not IS_TESTING:
-            db.contracts3link.upsert(
-                data={
-                    'create': {
-                        'contractAddress': contract_addr,
-                        's3Link': S3_Link,
-                        'status': 'finished',
-                        'updated_at': datetime.datetime.now()
-                    },
-                    'update': {
-                        's3Link': 'S3_Link',
-                        'status': 'finished',
-                        'updated_at': datetime.datetime.now()
-                    }
-                }, 
+            # On every loop, update the current NUM_IMAGES_UPLOADED, so that we can pick up where we left
+            # off in the event of having to re-queue this 
+            db.contracts3link.update(
                 where={
                     'contractAddress': contract_addr
+                },
+                data={
+                    'numImagesUploaded': i,
+                    's3Link': S3_Link,
+                    'status': 'in-progress'
                 }
             )
+            logger.debug(f'Uploaded {i} images for contract address: {contract_addr}')
+
+        db.contracts3link.upsert(
+            data={
+                'create': {
+                    'contractAddress': contract_addr,
+                    's3Link': S3_Link,
+                    'status': 'finished'
+                },
+                'update': {
+                    'status': 'finished'
+                }
+            }, 
+            where={
+                'contractAddress': contract_addr
+            }
+        )
     except Exception as e:
         logger.error(e, exc_info=True)
