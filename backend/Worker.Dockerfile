@@ -8,7 +8,7 @@ WORKDIR /tmp
 RUN pip install poetry
 
 # 
-COPY ./pyproject.toml ./poetry.lock* /tmp/
+COPY ./backend/pyproject.toml ./backend/poetry.lock* /tmp/
 
 # 
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 RUN mkdir /code/app
 
 # 
-COPY . /code/app
+COPY ./backend /code/app
 
 WORKDIR /code/app
 
