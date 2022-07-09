@@ -1,15 +1,15 @@
 import os
 import requests
 from constants import ALCHEMY_URL, IMAGE_CACHE_DIR, DEFAULT_RATE_LIMIT_COOLDOWN_TIME, MAX_COOLDOWN_TIME, \
-    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_URL_PREFIX, IS_TESTING
-import datetime
+    AWS_ACCESS_KEY, AWS_SECRET_KEY, BUCKET_NAME, BUCKET_URL_PREFIX, IS_TESTING, LOGTAIL_SOURCE_TOKEN
 import mimetypes
 import time
 import boto3
 import shutil
 from db_access import db
 from celery import Celery
-import logging.config
+import logging
+from logtail import LogtailHandler
 
 # Celery config
 app = Celery('tasks')
@@ -18,9 +18,11 @@ app.config_from_object('celeryconfig')
 # Configure AWS S3 client
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
-# Logging config
-logging.config.fileConfig('./logConfig/logging.ini')
+handler = LogtailHandler(source_token = LOGTAIL_SOURCE_TOKEN)
 logger = logging.getLogger(__name__)
+logger.handlers = []
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
 
 def getContractName(contract_addr: str) -> str:
     """Fetch the name of the contract (if present)

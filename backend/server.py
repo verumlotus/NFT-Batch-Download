@@ -1,13 +1,17 @@
 from fastapi import FastAPI
 from tasks import processNftCollection
 from db_access import db
-from constants import IS_TESTING
-import logging.config
+from constants import LOGTAIL_SOURCE_TOKEN
+import logging
 from datetime import datetime, timezone
+from logtail import LogtailHandler
 
 # Logging config
-logging.config.fileConfig('./logConfig/logging.ini')
+handler = LogtailHandler(source_token = LOGTAIL_SOURCE_TOKEN)
 logger = logging.getLogger(__name__)
+logger.handlers = []
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
 
 app = FastAPI()
 

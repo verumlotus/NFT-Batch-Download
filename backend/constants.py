@@ -34,3 +34,6 @@ BUCKET_URL_PREFIX = f'https://s3.console.aws.amazon.com/s3/buckets/{BUCKET_NAME}
 
 # Config
 IS_TESTING = os.getenv('IS_TESTING') == 'True'
+
+# Logtail
+LOGTAIL_SOURCE_TOKEN= os.getenv('LOGTAIL_SOURCE_TOKEN')
