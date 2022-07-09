@@ -17,7 +17,7 @@ Our server is run in a [Docker container](https://www.docker.com/resources/what-
 <img width="924" alt="image" src="https://user-images.githubusercontent.com/97858468/178121118-a19356eb-fcf1-42f9-8c52-9c90bc927c44.png">
 
 # Hosting this service
-Originally, the intention was to launch this service and allow users to batch upload images to AWS S3 and then download them. Unfortunately, the costs of hosting this infrastructure was too high. In particular, the [data egress cost](https://aws.amazon.com/s3/pricing/) from an S3 bucket made the cost prohibitvely high even if this service reached moderate adoption. Data egress is priced at $0.09/GB, and an NFT collection such as [Bored Ape Yacht Club](https://boredapeyachtclub.com/) is ~30GB with all images included. 
+Originally, the intention was to launch this service and allow users to batch upload images to AWS S3 and then download them. Unfortunately, the costs of hosting this infrastructure was too high for a college student. In particular, the [data egress cost](https://aws.amazon.com/s3/pricing/) from an S3 bucket made the cost prohibitvely high even if this service reached moderate adoption. Data egress is priced at $0.09/GB: assuming an average image size of 300KB and an average collection size of 10,000, each collection would be ~3GB with all images included. With 30 NFT collections of interest, and 100 users downloading all the images, we'd have $0.09/GB x 3GB x 30 x 100 = $810. This is only the S3 cost, and excludes other infrastructure costs. Mostly likely this service would have reached far lower numbers of users, but since AWS doesn't have a way to cap billing (only a way to set alerts), I didn't want to wake up to a large bill!
 
 
 
