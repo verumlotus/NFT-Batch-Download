@@ -5,6 +5,7 @@ import { useState } from 'react'
 import styles from '../styles/Home.module.css'
 import axios from "axios"
 import Footer from '../components/Footer'
+import Faq from '../components/Faq'
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL
 console.log(`Server is ${SERVER_URL}`)
@@ -74,6 +75,7 @@ const Home: NextPage = () => {
         {s3BucketLink &&
           <p>View the images <a href={s3BucketLink} style={{color: "blue"}}>here</a></p>
         }
+        <Faq/>
         <Footer/>
 
       </main>
