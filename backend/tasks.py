@@ -151,6 +151,14 @@ def downloadImagesLocally(tokenIdImageUrlPairList: list[tuple[str, str]]):
             # Use continue to go back to the start of the loop and try downloading this image again
             continue
 
+        # If we don't get status code 200 or 429, let's retry 1 time more before just skipping this
+        elif server_res.status_code != 200 and retry_flag:
+            time.sleep(2)
+            retry_flag = False
+            continue
+
+        retry_flag = True
+
         # Let's guess whether this file is PNG or JPEG using the content header
         contentTypeHeader = server_res.headers.get('content-type', None)
         # Default to .jpg if we content type header doesn't tell us encoding format
@@ -230,6 +238,9 @@ def processNftCollection(contract_addr: str):
                 }
             )
             logger.debug(f'Uploaded {i} images for contract address: {contract_addr}')
+            if IS_TESTING:
+                logger.debug(f'In testing mode, so stopping processNFTCollection after 1 loop')
+                break
 
         # Update DB at end to signal that we have uploaded all images in the collection
         db.contracts3link.upsert(
