@@ -61,15 +61,16 @@ def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 1
     # N.B: Enhanced API below only returns up to 100 NFTs at a time, 
     # so we need to paginate through until we get all of the NFTs
     startToken = _startToken
+    totalImageURIsFetched = 0
     while True:
-        logger.info(f'Fetching imageURI data from alchemy for {contract_addr} with start token {startToken}')
+        logger.debug(f'Fetching imageURI data from alchemy for {contract_addr} with start token {startToken}')
         server_res = requests.get(
             f'{ALCHEMY_URL}/getNFTsForCollection',
             params={
                 'contractAddress': contract_addr,
                 'withMetadata': "true",
                 'startToken': startToken,
-                'limit': limit
+                'limit': min(limit, 100)
             },
             allow_redirects=True
         )
@@ -98,8 +99,10 @@ def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 1
             imageUri = nftData['media'][0]['gateway']
             imageURI_list.append((tokenId, imageUri))
 
-        # If the # of tokens we got is == limit, then we're done
-        if len(res_json['nfts']) == limit or len(res_json['nfts']) == 0:
+        totalImageURIsFetched += len(res_json['nfts'])
+
+        # If the total # of tokens we got is >= limit, then we're done
+        if totalImageURIsFetched >= limit or len(res_json['nfts']) == 0:
             break
 
         # If no next token then we are done
@@ -110,7 +113,7 @@ def getTokenIdImageURIs(contract_addr: str, _startToken: int = 0, limit: int = 1
         startToken = int(res_json['nextToken'], 16)
 
         # Break below is only to prevent pagination during test
-        if (IS_TESTING):
+        if (IS_TESTING and False):
             return imageURI_list
 
     logger.debug(f'Got all image URIs for contract addr: {contract_addr}')
